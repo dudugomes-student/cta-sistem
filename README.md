@@ -22,7 +22,11 @@ Para testar:
 
 ## Rodar no computador
 
-Qualquer servidor estático serve. Com Node instalado:
+Abrir o arquivo com dois cliques não funciona, porque o navegador bloqueia os scripts fora de um servidor.
+
+No VS Code, instale a extensão Live Server (o VS Code sugere sozinho ao abrir a pasta) e clique em Go Live, no canto de baixo. O projeto já vem configurado para servir a pasta `public`: o site abre em http://127.0.0.1:5500 e o painel em http://127.0.0.1:5500/painel/.
+
+Sem o VS Code, com Node instalado:
 
 ```
 npx serve public

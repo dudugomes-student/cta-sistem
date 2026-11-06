@@ -4,8 +4,7 @@ import { esc, $, $$, avatar, faixa, textoFaixa, faixasPara, abrirDialogo, mascar
 
 const raiz = $('#raiz');
 let quem = null;
-try { quem = JSON.parse(localStorage.getItem('cta-equipe') || 'null'); } catch (e) { quem = null; }
-const guardar = () => { try { localStorage.setItem('cta-equipe', JSON.stringify(quem)); } catch (e) { /* sem armazenamento */ } };
+const sair = async () => { quem = null; rotaAtual = null; try { await D.sair(); } catch (e) { /* sem conexão */ } raiz.innerHTML = ''; ir(); };
 
 const nomeModalidade = (id) => (D.MODALIDADES.find((m) => m.id === id) || {}).nome || id;
 const listaModalidades = (ids) => ids.map(nomeModalidade).join(', ');
@@ -77,7 +76,7 @@ function montarEstrutura() {
   });
   $('#veu').addEventListener('click', fecharMenu);
   $('#menu').addEventListener('click', (e) => { if (e.target.closest('a')) fecharMenu(); });
-  $('#sair').addEventListener('click', () => { quem = null; guardar(); ir(); });
+  $('#sair').addEventListener('click', sair);
   let recolhido = false;
   try { recolhido = localStorage.getItem('cta-menu') === 'recolhido'; } catch (e) { /* segue */ }
   shell.classList.toggle('recolhido', recolhido);
@@ -137,18 +136,18 @@ function telaEntrar() {
     <p class="alert" id="l-erro" role="alert"></p>
     <button class="btn" type="submit">Entrar</button>
     <p class="hint" style="margin-top:0">Esqueceu a senha? Peça para outra pessoa da equipe redefinir.</p>
-    ${CONFIG.modoTeste ? `<p class="test-note">Modo de teste: login teste@${CONFIG.dominioLogin}, senha tatame.</p>` : ''}
   </form></main>`;
   animar($('#login'));
   $('#login').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('#l-erro').textContent = '';
+    const b = $('#login button[type=submit]');
+    b.disabled = true; b.textContent = 'Entrando';
     try {
       quem = await D.entrarEquipe($('#l-user').value, $('#l-senha').value);
-      guardar();
       location.hash = '#hoje';
       ir();
-    } catch (err) { requestAnimationFrame(() => { $('#l-erro').textContent = err.message; }); }
+    } catch (err) { b.disabled = false; b.textContent = 'Entrar'; requestAnimationFrame(() => { $('#l-erro').textContent = err.message; }); }
   });
 }
 
@@ -655,18 +654,32 @@ function dialogoSenha(id) {
 
 function telaAjustes() {
   app().innerHTML = `
-    ${cabecalho('Ajustes', 'Sessão e dados do sistema.')}
+    ${cabecalho('Ajustes', 'Sua conta e as regras do sistema.')}
     <div class="group">
       <div class="row"><span class="person">${avatar({ nome: quem.nome })}<span class="row-main">${esc(quem.nome)}<small>${esc(quem.login)}</small></span></span><button class="btn quiet small" type="button" id="m-sair">Sair</button></div>
+      <div class="row"><span>Sua senha<small>Troque a senha inicial por uma que só você saiba</small></span><button class="btn quiet small" type="button" id="m-senha">Trocar senha</button></div>
+    </div>
+    <p class="section-label">Regras</p>
+    <div class="group">
       <div class="row"><span>Alunos inativos<small>Quem passa ${D.DIAS_INATIVO} dias sem treinar</small></span><span class="v k">${D.DIAS_INATIVO} dias</span></div>
       <div class="row"><span>Aviso para cobrar<small>Aluno sem treinar com item emprestado</small></span><span class="v k">${D.DIAS_COBRAR} dias</span></div>
+      <div class="row"><span>Check-in só dentro do CTA<small>${CONFIG.localCTA ? 'Ligado, pela localização do celular' : 'Desligado até o endereço do CTA ser configurado'}</small></span><span class="v k">${CONFIG.localCTA ? 'Ligado' : 'Desligado'}</span></div>
     </div>
-    ${CONFIG.modoTeste ? `<p class="section-label">Modo de teste</p>
-    <div class="group"><div class="row"><span>Dados de exemplo<small>Os dados ficam só neste computador. Recomeçar apaga tudo e volta ao exemplo.</small></span><button class="btn quiet small" type="button" id="m-reset">Recomeçar</button></div></div>` : ''}`;
-  $('#m-sair').addEventListener('click', () => { quem = null; guardar(); ir(); });
-  const reset = $('#m-reset');
-  if (reset) reset.addEventListener('click', () => abrirDialogo('Recomeçar os dados de teste', '<p class="hint" style="margin:0">Tudo o que foi feito neste computador some e o exemplo volta ao começo.</p><button class="btn" type="button" id="r-ok">Recomeçar</button>', (dlg, fechar) => {
-    $('#r-ok', dlg).addEventListener('click', async () => { await D.recomecarTeste(); fechar(); location.hash = '#hoje'; ir(); });
+    <p class="hint" style="margin-top:0">Os dados ficam no banco do CTA na internet e são os mesmos no programa, no painel pelo celular e no site.</p>`;
+  $('#m-sair').addEventListener('click', sair);
+  $('#m-senha').addEventListener('click', () => abrirDialogo('Trocar sua senha', `
+    <div class="group">
+      <label class="field"><span>Nova senha</span><input id="ms-1" type="password" autocomplete="new-password" placeholder="Pelo menos 6 caracteres"></label>
+      <label class="field"><span>Repita a nova senha</span><input id="ms-2" type="password" autocomplete="new-password"></label>
+    </div>
+    <p class="alert" id="ms-erro" role="alert"></p>
+    <button class="btn" type="button" id="ms-ok">Salvar senha</button>`, (dlg, fechar) => {
+    $('#ms-ok', dlg).addEventListener('click', async () => {
+      $('#ms-erro', dlg).textContent = '';
+      if ($('#ms-1', dlg).value !== $('#ms-2', dlg).value) { $('#ms-erro', dlg).textContent = 'As duas senhas estão diferentes.'; return; }
+      try { await D.trocarMinhaSenha($('#ms-1', dlg).value); fechar(); aviso('Senha trocada'); }
+      catch (err) { $('#ms-erro', dlg).textContent = err.message; }
+    });
   }));
 }
 
@@ -681,7 +694,8 @@ const ROTAS = {
 let rotaAtual = null;
 
 function ir() {
-  if (!quem || !D.equipe().some((p) => p.id === quem.id)) { quem = null; guardar(); rotaAtual = null; telaEntrar(); return; }
+  quem = D.usuario();
+  if (!quem) { rotaAtual = null; telaEntrar(); return; }
   if (!$('#shell')) montarEstrutura();
   const pedida = (location.hash || '#hoje').slice(1);
   const rota = ROTAS[pedida] ? pedida : 'hoje';
@@ -692,6 +706,23 @@ function ir() {
   else { ROTAS[rota](); animar(app()); }
 }
 
+// quando o banco muda (site, outro computador, outra pessoa), a tela atual se atualiza sozinha
+let atualizarDepois = false;
+function atualizarAoVivo() {
+  if (!quem || !$('#shell')) return;
+  const ocupado = $('.dialog-wrap') || (document.activeElement && document.activeElement.closest && document.activeElement.closest('#app input, #app textarea, #app select'));
+  if (ocupado) { atualizarDepois = true; return; }
+  atualizarDepois = false;
+  desenharMenu(rotaAtual);
+  ROTAS[rotaAtual]();
+  animar(app());
+}
+D.aoMudar(atualizarAoVivo);
+D.aoErro((m) => aviso(m, 'erro'));
+document.addEventListener('click', () => { if (atualizarDepois) setTimeout(atualizarAoVivo, 400); });
+
 montarFundo();
 abertura('Painel do professor');
-D.iniciar().then(() => { window.addEventListener('hashchange', ir); ir(); });
+D.iniciar()
+  .catch((err) => { aviso(err.message, 'erro'); })
+  .finally(() => { window.addEventListener('hashchange', ir); ir(); });

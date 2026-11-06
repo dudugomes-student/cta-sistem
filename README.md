@@ -8,17 +8,13 @@ O CTA oferece treinos gratuitos de boxe, jiu-jitsu e muay thai, num projeto da i
 
 - **Site dos alunos** (`public/index.html`): cadastro, check-in, minha conta com a carteirinha, e horários.
 - **Painel** (`public/painel/`): hoje, alunos, empréstimos de kimonos e faixas, números, horários e equipe.
-- **Banco de dados** (`supabase/schema.sql`): tabelas, regras de acesso e funções do site.
+- **Banco de dados** (`supabase/README.md`): como o banco do Supabase está organizado e quem vê o quê.
 
 ## Situação atual
 
-O sistema está em modo de teste. Tudo funciona no navegador com dados de exemplo, guardados só no aparelho de quem abre. Nada vai para a internet ainda.
+O sistema está ligado ao banco do CTA no Supabase. Tudo o que é feito no programa, no painel pelo celular e no site vai direto para o banco, e as telas do painel se atualizam sozinhas quando alguém faz cadastro ou check-in. Detalhes do banco em `supabase/README.md`.
 
-Para testar:
-
-- Site: celular (11) 98765-4321, PIN 1234.
-- Painel: login teste@cta.app, senha tatame.
-- O botão Recomeçar, em Painel > Mais, volta os dados de teste ao começo.
+O primeiro acesso do painel é `douglas@cta.app`. Pela tela Equipe, qualquer pessoa da equipe cria novos logins na hora.
 
 ## Programa para Windows
 
@@ -56,15 +52,10 @@ firebase use --add
 firebase deploy --only hosting
 ```
 
-## Ligar o Supabase
+## Falta configurar
 
-Falta para sair do modo de teste:
-
-- Rodar `supabase/schema.sql` no SQL Editor do projeto do CTA.
-- Preencher a URL e a chave anon em `public/assets/config.js`.
-- Preencher as coordenadas do CTA em `config.js`, para o check-in conferir a localização.
-- Trocar `modoTeste` para `false` e ligar `public/assets/dados.js` às funções do Supabase.
+- As coordenadas do CTA em `public/assets/config.js`, para o check-in só funcionar lá dentro.
 
 ## Identidade visual
 
-As telas seguem o design system CTA Alphaville: fundo de tatame, vidro discreto sem bordas, fonte do próprio aparelho e vermelho só no que pede ação. Nada de visual com cara de gerado por IA.
+Tema preto com vidro fosco e relevo suave, luzes difusas e gotas de vidro no fundo, vermelho do CTA nos destaques e animações em telas, listas, botões e confirmações.

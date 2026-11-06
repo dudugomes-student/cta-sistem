@@ -4,8 +4,7 @@ import { esc, $, $$, avatar, faixa, textoFaixa, mascararCelular, marcarAba, mont
 
 const app = $('#app');
 const abas = $('#abas');
-let sessao = null;
-try { sessao = JSON.parse(sessionStorage.getItem('cta-aluno') || 'null'); } catch (e) { sessao = null; }
+let conta = null;
 
 const nomeModalidade = (id) => (D.MODALIDADES.find((m) => m.id === id) || {}).nome || id;
 const listaModalidades = (ids) => ids.map(nomeModalidade).join(', ');
@@ -16,7 +15,6 @@ function topo(lado) {
   return `<header class="bar"><a class="wordmark" href="#checkin">CTA</a><span class="side">${esc(texto)}</span></header>`;
 }
 
-const notaTeste = () => (CONFIG.modoTeste ? '<p class="test-note">Modo de teste: os dados ficam só neste aparelho. Celular de exemplo (11) 98765-4321, PIN 1234.</p>' : '');
 
 // ---------- check-in ----------
 
@@ -28,16 +26,18 @@ function telaCheckin() {
     <div class="group"><label class="field"><span>Celular</span><input id="ck-cel" class="big" type="tel" inputmode="numeric" autocomplete="tel" placeholder="(11) 90000-0000"></label></div>
     <div id="ck-res" class="stack"></div>
     <div id="ck-acao" class="stack"></div>
-  </section>${notaTeste()}`;
+  </section>`;
   const cel = $('#ck-cel');
   mascararCelular(cel, D.formatarCelular);
   let escolhido = null;
   let chave = '';
+  let lista = [];
+  let buscado = '';
+  let espera = null;
 
   const desenhar = () => {
     const res = $('#ck-res');
     const acao = $('#ck-acao');
-    const lista = D.buscarPorCelular(cel.value);
     if (D.soDigitos(cel.value).length < 10) { res.innerHTML = ''; acao.innerHTML = ''; escolhido = null; chave = ''; return; }
     if (lista.length === 0) {
       res.innerHTML = '<p class="alert">Não achamos cadastro com esse celular.</p>';
@@ -56,9 +56,9 @@ function telaCheckin() {
     if (nova !== chave) { chave = nova; animar(res); }
     $$('[data-id]', res).forEach((b) => b.addEventListener('click', () => { escolhido = b.dataset.id; desenhar(); animar(acao); }));
 
-    const a = escolhido && D.aluno(escolhido);
+    const a = escolhido && lista.find((x) => x.id === escolhido);
     if (!a) { acao.innerHTML = ''; return; }
-    if (D.fezHoje(a.id)) {
+    if (a.jaFez) {
       acao.innerHTML = `<p class="ok-text">${esc(D.primeiroNome(a.nome))}, sua presença de hoje já está registrada.</p>`;
       return;
     }
@@ -68,7 +68,15 @@ function telaCheckin() {
       b.disabled = true; b.textContent = 'Conferindo a localização';
       const local = await D.conferirLocal();
       if (!local.ok) { b.disabled = false; b.textContent = 'Confirmar presença'; $('#ck-msg').innerHTML = `<span class="alert">${esc(local.motivo)}</span>`; return; }
-      D.fazerCheckin(a.id);
+      b.textContent = 'Registrando';
+      try {
+        await D.site.checkin(cel.value, a.id);
+      } catch (err) {
+        b.disabled = false; b.textContent = 'Confirmar presença';
+        $('#ck-msg').innerHTML = `<span class="alert">${esc(err.message)}</span>`;
+        return;
+      }
+      a.jaFez = true;
       const agora = new Date();
       b.classList.add('done');
       b.textContent = `${D.primeiroNome(a.nome)}, presença registrada`;
@@ -77,7 +85,21 @@ function telaCheckin() {
       $('#ck-msg').textContent = `Às ${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}. Bom treino.`;
     });
   };
-  cel.addEventListener('input', desenhar);
+
+  const aoDigitar = () => {
+    const d = D.soDigitos(cel.value);
+    clearTimeout(espera);
+    if (d.length < 10) { lista = []; buscado = ''; desenhar(); return; }
+    if (d === buscado) return;
+    espera = setTimeout(async () => {
+      buscado = d;
+      $('#ck-acao').innerHTML = '<p class="hint" style="margin:0">Procurando seu cadastro</p>';
+      try { lista = await D.site.buscar(d); }
+      catch (err) { lista = []; $('#ck-res').innerHTML = `<p class="alert">${esc(err.message)}</p>`; $('#ck-acao').innerHTML = ''; buscado = ''; return; }
+      if (D.soDigitos(cel.value) === d) desenhar();
+    }, 250);
+  };
+  cel.addEventListener('input', aoDigitar);
   cel.focus();
 }
 
@@ -142,7 +164,7 @@ function telaCadastro() {
 
     <p class="alert" id="c-erro" role="alert"></p>
     <button class="btn" type="submit" id="c-ok">Concluir cadastro</button>
-  </form>${notaTeste()}`;
+  </form>`;
 
   ['#c-cel', '#c-rcel', '#c-ecel'].forEach((s) => mascararCelular($(s), D.formatarCelular));
   const ajustarMenor = () => {
@@ -213,14 +235,10 @@ function reduzirFoto(arquivo) {
 
 // ---------- minha conta ----------
 
-function guardarSessao() { try { sessionStorage.setItem('cta-aluno', JSON.stringify(sessao)); } catch (e) { /* sem armazenamento */ } }
-
 function telaConta() {
-  if (sessao && sessao.ids && sessao.ids.length) {
-    const lista = sessao.ids.map(D.aluno).filter(Boolean);
-    if (lista.length === 0) { sessao = null; guardarSessao(); return telaConta(); }
-    const atual = D.aluno(sessao.atual) || lista[0];
-    return mostrarCarteirinha(atual, lista);
+  if (conta && conta.lista.length) {
+    const atual = conta.lista.find((x) => x.id === conta.atual) || conta.lista[0];
+    return mostrarCarteirinha(atual, conta.lista);
   }
   app.innerHTML = `${topo('Minha conta')}
   <form class="view" id="entrar" novalidate>
@@ -231,25 +249,28 @@ function telaConta() {
       <label class="field"><span>PIN</span><input id="e-pin" class="big" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password"></label>
     </div>
     <p class="alert" id="e-erro" role="alert"></p>
-    <button class="btn" type="submit">Entrar</button>
-  </form>${notaTeste()}`;
+    <button class="btn" type="submit" id="e-ok">Entrar</button>
+  </form>`;
   mascararCelular($('#e-cel'), D.formatarCelular);
   $('#entrar').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const b = $('#e-ok');
+    $('#e-erro').textContent = '';
+    b.disabled = true; b.textContent = 'Entrando';
     try {
-      const lista = await D.entrarAluno($('#e-cel').value, $('#e-pin').value);
-      sessao = { ids: lista.map((a) => a.id), atual: lista[0].id };
-      guardarSessao();
+      const lista = await D.site.conta($('#e-cel').value, $('#e-pin').value);
+      conta = { lista, atual: lista[0].id };
       trocarTela(app, telaConta);
-    } catch (err) { $('#e-erro').textContent = err.message; }
+    } catch (err) {
+      b.disabled = false; b.textContent = 'Entrar';
+      requestAnimationFrame(() => { $('#e-erro').textContent = err.message; });
+    }
   });
 }
 
 function mostrarCarteirinha(a, lista) {
-  const g = a.graduacoes && a.graduacoes.jiujitsu;
+  const g = a.graduacao;
   const mes = D.nomeMes(new Date().getMonth());
-  const itens = D.emprestimosDe(a.id);
-  const ultimos = D.checkinsDe(a.id).slice(0, 5);
   app.innerHTML = `${topo('Minha conta')}
   <section class="view">
     ${lista.length > 1 ? `<div class="group"><label class="field"><span>Ver a conta de</span><select id="troca">${lista.map((x) => `<option value="${x.id}"${x.id === a.id ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label></div>` : ''}
@@ -264,33 +285,38 @@ function mostrarCarteirinha(a, lista) {
 
     <p class="section-label">${mes[0].toUpperCase() + mes.slice(1)}</p>
     <div class="group">
-      <div class="row"><span class="k">Treinos no mês</span><span class="v">${D.treinosNoMes(a.id)}</span></div>
-      ${itens.length ? itens.map((e) => `<div class="row"><span class="k">Com você</span><span class="v">${e.item === 'kimono' ? 'Kimono' : 'Faixa ' + esc(e.cor)} ${esc(e.tamanho)}<small>desde ${esc(D.dataCurta(e.saida))}</small></span></div>`).join('') : '<div class="row"><span class="k">Com você</span><span class="v">Nenhum kimono ou faixa</span></div>'}
+      <div class="row"><span class="k">Treinos no mês</span><span class="v">${a.treinosNoMes}</span></div>
+      ${a.emprestimos.length ? a.emprestimos.map((e) => `<div class="row"><span class="k">Com você</span><span class="v">${e.item === 'kimono' ? 'Kimono' : 'Faixa ' + esc(e.cor)} ${esc(e.tamanho)}<small>desde ${esc(D.dataCurta(e.saida))}</small></span></div>`).join('') : '<div class="row"><span class="k">Com você</span><span class="v">Nenhum kimono ou faixa</span></div>'}
     </div>
 
     <p class="section-label">Últimos treinos</p>
-    <div class="group">${ultimos.length ? ultimos.map((c) => `<div class="row"><span>${esc(D.dataCurta(c.data))}</span><span class="v k">${esc(c.hora)}</span></div>`).join('') : '<p class="empty">Ainda sem treinos registrados.</p>'}</div>
+    <div class="group">${a.ultimos.length ? a.ultimos.map((c) => `<div class="row"><span>${esc(D.dataCurta(c.data))}</span><span class="v k">${esc(c.hora)}</span></div>`).join('') : '<p class="empty">Ainda sem treinos registrados.</p>'}</div>
 
     <button class="btn quiet" type="button" id="sair">Sair</button>
   </section>`;
   const troca = $('#troca');
-  if (troca) troca.addEventListener('change', () => { sessao.atual = troca.value; guardarSessao(); trocarTela(app, telaConta); });
-  $('#sair').addEventListener('click', () => { sessao = null; guardarSessao(); trocarTela(app, telaConta); });
+  if (troca) troca.addEventListener('change', () => { conta.atual = troca.value; trocarTela(app, telaConta); });
+  $('#sair').addEventListener('click', () => { conta = null; trocarTela(app, telaConta); });
 }
 
 // ---------- horários ----------
 
 function telaHorarios() {
-  const lista = D.horarios();
-  const porDia = D.DIAS.map((d) => ({ dia: d, aulas: lista.filter((h) => h.dia === d) })).filter((x) => x.aulas.length);
   app.innerHTML = `${topo('Horários')}
   <section class="view">
     <h1>Horários</h1>
     <p class="hint">Treinos gratuitos. Chegue uns minutos antes para fazer o check-in.</p>
-    ${porDia.length ? porDia.map((d) => `<p class="section-label">${d.dia}</p><div class="group">${d.aulas.map((h) => `
-      <div class="row"><span>${esc(nomeModalidade(h.modalidade))}${h.turma ? `<small>${esc(h.turma)}</small>` : ''}</span><span class="v">${esc(h.inicio)} às ${esc(h.fim)}</span></div>`).join('')}</div>`).join('')
-      : '<div class="group"><p class="empty">A grade de horários ainda não foi publicada.</p></div>'}
+    <div id="grade" class="stack"><div class="group"><p class="empty">Carregando a grade</p></div></div>
   </section>`;
+  D.site.horarios().then((lista) => {
+    const g = $('#grade');
+    if (!g) return;
+    const porDia = D.DIAS.map((d) => ({ dia: d, aulas: lista.filter((h) => h.dia === d) })).filter((x) => x.aulas.length);
+    g.innerHTML = porDia.length ? porDia.map((d) => `<p class="section-label">${d.dia}</p><div class="group">${d.aulas.map((h) => `
+      <div class="row"><span>${esc(nomeModalidade(h.modalidade))}${h.turma ? `<small>${esc(h.turma)}</small>` : ''}</span><span class="v">${esc(h.inicio)} às ${esc(h.fim)}</span></div>`).join('')}</div>`).join('')
+      : '<div class="group"><p class="empty">A grade de horários ainda não foi publicada.</p></div>';
+    animar(g);
+  }).catch((err) => { const g = $('#grade'); if (g) g.innerHTML = `<p class="alert">${esc(err.message)}</p>`; });
 }
 
 // ---------- rotas ----------
@@ -308,4 +334,5 @@ montarFundo();
 abertura('Centro de Treinamento de Alphaville');
 if (document.fonts) document.fonts.ready.then(() => marcarAba(abas, (location.hash || '#checkin').slice(1)));
 window.addEventListener('resize', () => marcarAba(abas, (location.hash || '#checkin').slice(1)));
-D.iniciar().then(() => { window.addEventListener('hashchange', () => { ir(); window.scrollTo({ top: 0, behavior: 'smooth' }); }); ir(); });
+window.addEventListener('hashchange', () => { ir(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+ir();

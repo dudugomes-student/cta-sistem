@@ -20,6 +20,19 @@ Para testar:
 - Painel: login teste@cta.app, senha tatame.
 - O botão Recomeçar, em Painel > Mais, volta os dados de teste ao começo.
 
+## Programa para Windows
+
+O painel também é um programa instalável, CTA Painel, na pasta `desktop`. A cada atualização do painel no GitHub, o instalador é gerado sozinho numa máquina Windows e fica na página Releases do repositório, como CTA-Painel-Instalador.
+
+Para gerar no próprio Windows, dentro da pasta `desktop`:
+
+```
+npm install
+npm run exe
+```
+
+O instalador sai em `desktop/dist`. Para abrir o programa sem instalar: `npm start`.
+
 ## Rodar no computador
 
 Abrir o arquivo com dois cliques não funciona, porque o navegador bloqueia os scripts fora de um servidor.

@@ -1,0 +1,39 @@
+{
+  "name": "cta-painel",
+  "productName": "CTA Painel",
+  "version": "0.1.0",
+  "description": "Painel do CTA Alphaville para professores e equipe",
+  "author": "CTA Alphaville",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "copiar": "node copiar.js",
+    "start": "node copiar.js && electron .",
+    "exe": "node copiar.js && electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "br.org.ctaalphaville.painel",
+    "productName": "CTA Painel",
+    "executableName": "CTA Painel",
+    "files": ["main.js", "app/**/*"],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CTA Painel",
+      "artifactName": "CTA-Painel-Instalador-${version}.exe",
+      "language": "1046"
+    }
+  }
+}

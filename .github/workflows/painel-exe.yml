@@ -1,0 +1,54 @@
+name: Gerar instalador do painel
+
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', 'public/painel/**', 'public/assets/**', '.github/workflows/painel-exe.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+
+      - name: Gerar o instalador
+        run: npm run exe
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Ler a versão
+        id: versao
+        shell: bash
+        run: echo "v=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Guardar o instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: CTA-Painel-Instalador
+          path: desktop/dist/*.exe
+
+      - name: Publicar para download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: painel-v${{ steps.versao.outputs.v }}
+          name: CTA Painel ${{ steps.versao.outputs.v }}
+          body: |
+            Instalador do painel do CTA para Windows.
+            Baixe o arquivo CTA-Painel-Instalador e abra para instalar.
+            Se o Windows avisar que o aplicativo não é reconhecido, clique em Mais informações e depois em Executar assim mesmo.
+          files: desktop/dist/*.exe
+          make_latest: true

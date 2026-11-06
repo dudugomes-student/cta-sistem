@@ -52,9 +52,9 @@ firebase use --add
 firebase deploy --only hosting
 ```
 
-## Falta configurar
+## Check-in no local
 
-- As coordenadas do CTA em `public/assets/config.js`, para o check-in só funcionar lá dentro.
+O check-in pelo site só funciona dentro do CTA, na Lagoinha Alphaville (Av. Tamboré, 74, Barueri), num raio de 200 metros. Para mudar, ajuste `localCTA` em `public/assets/config.js`.
 
 ## Identidade visual
 

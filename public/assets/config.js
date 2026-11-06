@@ -7,6 +7,7 @@ export const CONFIG = {
     url: 'https://qjsfqhrqqrkngjgectyn.supabase.co',
     chave: 'sb_publishable_abvLMFKONs6CysNCKnjnJg_dgwFYPX1',
   },
-  // Coordenadas do CTA para o check-in só funcionar lá dentro. Enquanto estiver vazio, o check-in funciona de qualquer lugar.
-  localCTA: null, // { lat: -23.5, lng: -46.85, raioMetros: 150 }
+  // O check-in só funciona dentro do CTA, na Lagoinha Alphaville (Av. Tamboré, 74, Barueri).
+  // O raio cobre o terreno e a imprecisão do GPS do celular dentro do prédio.
+  localCTA: { lat: -23.5046592, lng: -46.8448107, raioMetros: 200 },
 };

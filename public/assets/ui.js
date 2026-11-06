@@ -7,7 +7,8 @@ export function esc(s) {
 export const $ = (sel, raiz = document) => raiz.querySelector(sel);
 export const $$ = (sel, raiz = document) => Array.from(raiz.querySelectorAll(sel));
 
-const semMovimento = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// as animações fazem parte do sistema: rodam sempre, mesmo com "reduzir movimento" ligado no aparelho
+const semMovimento = () => false;
 
 // fundo com luzes difusas, aurora e gotas de vidro, mais todos os efeitos de interação
 export function montarFundo() {

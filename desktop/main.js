@@ -6,6 +6,9 @@ const { app, BrowserWindow, protocol, net, shell, Menu } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
+// o programa ignora a opção do Windows de desligar animações: elas fazem parte do sistema
+app.commandLine.appendSwitch('force-prefers-no-reduced-motion');
+
 protocol.registerSchemesAsPrivileged([
   { scheme: 'cta', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ]);

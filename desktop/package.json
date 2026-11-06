@@ -1,7 +1,7 @@
 {
   "name": "cta-painel",
   "productName": "CTA Painel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Painel do CTA Alphaville para professores e equipe",
   "author": "CTA Alphaville",
   "main": "main.js",

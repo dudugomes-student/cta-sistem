@@ -1,6 +1,6 @@
 import * as D from './dados.js';
 import { CONFIG } from './config.js';
-import { esc, $, $$, avatar, faixa, textoFaixa, mascararCelular, marcarAba } from './ui.js';
+import { esc, $, $$, avatar, faixa, textoFaixa, mascararCelular, marcarAba, montarFundo, animar, trocarTela } from './ui.js';
 
 const app = $('#app');
 const abas = $('#abas');
@@ -32,25 +32,29 @@ function telaCheckin() {
   const cel = $('#ck-cel');
   mascararCelular(cel, D.formatarCelular);
   let escolhido = null;
+  let chave = '';
 
   const desenhar = () => {
     const res = $('#ck-res');
     const acao = $('#ck-acao');
     const lista = D.buscarPorCelular(cel.value);
-    if (D.soDigitos(cel.value).length < 10) { res.innerHTML = ''; acao.innerHTML = ''; escolhido = null; return; }
+    if (D.soDigitos(cel.value).length < 10) { res.innerHTML = ''; acao.innerHTML = ''; escolhido = null; chave = ''; return; }
     if (lista.length === 0) {
       res.innerHTML = '<p class="alert">Não achamos cadastro com esse celular.</p>';
       acao.innerHTML = '<a class="btn quiet" href="#cadastro">Fazer cadastro</a>';
       escolhido = null;
+      if (chave !== 'nada') { chave = 'nada'; animar(res); animar(acao); }
       return;
     }
     if (!escolhido || !lista.some((a) => a.id === escolhido)) escolhido = lista.length === 1 ? lista[0].id : null;
     res.innerHTML = `${lista.length > 1 ? '<p class="section-label">Quem vai treinar?</p>' : ''}<div class="group">${lista.map((a) => `
       <button class="row" type="button" data-id="${a.id}" aria-pressed="${a.id === escolhido}">
         <span class="person">${avatar(a)}<span class="row-main">${esc(a.nome)}<small>${esc(listaModalidades(a.modalidades))}</small></span></span>
-        ${a.id === escolhido ? '<span aria-hidden="true">✓</span>' : ''}
+        <span class="marcado" aria-hidden="true">${a.id === escolhido ? '✓' : ''}</span>
       </button>`).join('')}</div>`;
-    $$('[data-id]', res).forEach((b) => b.addEventListener('click', () => { escolhido = b.dataset.id; desenhar(); }));
+    const nova = lista.map((x) => x.id).join(',');
+    if (nova !== chave) { chave = nova; animar(res); }
+    $$('[data-id]', res).forEach((b) => b.addEventListener('click', () => { escolhido = b.dataset.id; desenhar(); animar(acao); }));
 
     const a = escolhido && D.aluno(escolhido);
     if (!a) { acao.innerHTML = ''; return; }
@@ -176,7 +180,8 @@ function telaCadastro() {
         <p class="hint">Seu cadastro está feito. Quando chegar no CTA, é só fazer o check-in com o celular${novo.responsavel ? ' do responsável' : ''}.</p>
         <a class="btn" href="#checkin">Ir para o check-in</a>
       </section>`;
-      window.scrollTo(0, 0);
+      animar(app);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       erro.textContent = err.message;
       b.disabled = false;
@@ -232,7 +237,7 @@ function telaConta() {
       const lista = await D.entrarAluno($('#e-cel').value, $('#e-pin').value);
       sessao = { ids: lista.map((a) => a.id), atual: lista[0].id };
       guardarSessao();
-      telaConta();
+      trocarTela(app, telaConta);
     } catch (err) { $('#e-erro').textContent = err.message; }
   });
 }
@@ -266,8 +271,8 @@ function mostrarCarteirinha(a, lista) {
     <button class="btn quiet" type="button" id="sair">Sair</button>
   </section>`;
   const troca = $('#troca');
-  if (troca) troca.addEventListener('change', () => { sessao.atual = troca.value; guardarSessao(); telaConta(); });
-  $('#sair').addEventListener('click', () => { sessao = null; guardarSessao(); telaConta(); });
+  if (troca) troca.addEventListener('change', () => { sessao.atual = troca.value; guardarSessao(); trocarTela(app, telaConta); });
+  $('#sair').addEventListener('click', () => { sessao = null; guardarSessao(); trocarTela(app, telaConta); });
 }
 
 // ---------- horários ----------
@@ -293,7 +298,10 @@ function ir() {
   const rota = (location.hash || '#checkin').slice(1);
   const tela = ROTAS[rota] || telaCheckin;
   marcarAba(abas, ROTAS[rota] ? rota : 'checkin');
-  tela();
+  trocarTela(app, tela);
 }
 
-D.iniciar().then(() => { window.addEventListener('hashchange', () => { ir(); window.scrollTo(0, 0); }); ir(); });
+montarFundo();
+if (document.fonts) document.fonts.ready.then(() => marcarAba(abas, (location.hash || '#checkin').slice(1)));
+window.addEventListener('resize', () => marcarAba(abas, (location.hash || '#checkin').slice(1)));
+D.iniciar().then(() => { window.addEventListener('hashchange', () => { ir(); window.scrollTo({ top: 0, behavior: 'smooth' }); }); ir(); });

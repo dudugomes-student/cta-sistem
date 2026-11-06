@@ -50,6 +50,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   min-height: 100vh;
@@ -422,3 +423,7 @@ button.row:hover .avatar, .row:hover .avatar { transform: scale(1.08) rotate(-3d
 select option { background: #1b1c1f; color: var(--ink); }
 input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(.85); cursor: pointer; }
 * { scrollbar-color: rgba(255,255,255,.15) transparent; }
+
+/* o conteúdo do painel segue o mesmo ritmo vertical das outras telas */
+.content-inner { display: flex; flex-direction: column; gap: var(--space-4); }
+.content-inner > .acoes { margin-top: 2px; }

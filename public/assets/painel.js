@@ -382,23 +382,25 @@ function telaNovoAluno() {
             <label class="field"><span id="c-cel-rot">Celular com WhatsApp</span><input id="c-cel" type="tel" inputmode="numeric" placeholder="(11) 90000-0000"></label>
           </div>
           <div id="c-resp" class="view" hidden>
-            <p class="section-label">Responsável</p>
+            <p class="section-label" id="c-resp-rot">Responsável</p>
             <div class="group">
               <label class="field"><span>Nome do responsável</span><input id="c-rnome" placeholder="Patrícia Oliveira"></label>
               <label class="field"><span>Celular do responsável</span><input id="c-rcel" type="tel" inputmode="numeric" placeholder="(11) 90000-0000"></label>
             </div>
+            <p class="hint" style="margin-top:0" id="c-resp-dica"></p>
           </div>
           <p class="section-label">Modalidades</p>
           <div class="group"><div class="checks">${D.MODALIDADES.map((m) => `<label class="check"><input type="checkbox" name="mod" value="${m.id}">${m.nome}</label>`).join('')}</div></div>
         </div>
         <div class="view">
-          <p class="section-label">Contato de emergência</p>
+          <p class="section-label">Contato de emergência, opcional</p>
           <div class="group">
             <label class="field"><span>Nome</span><input id="c-enome" placeholder="Maria Silva"></label>
             <label class="field"><span>Telefone</span><input id="c-ecel" type="tel" inputmode="numeric" placeholder="(11) 90000-0000"></label>
           </div>
           <p class="section-label">Outras informações</p>
           <div class="group">
+            <label class="field"><span>Treina no CTA desde</span><input id="c-inicio" type="date" max="${D.hojeISO()}" value="${D.hojeISO()}"></label>
             <label class="field"><span>Tamanho do kimono</span><select id="c-kim"><option value="">Não sei</option>${D.TAMANHOS_KIMONO.map((t) => `<option>${t}</option>`).join('')}</select></label>
             <label class="field"><span>Problema de saúde ou lesão</span><textarea id="c-saude" rows="2" placeholder="Opcional"></textarea></label>
             <label class="field"><span>PIN inicial do aluno, 4 números</span><input id="c-pin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Passe para o aluno"></label>
@@ -410,12 +412,17 @@ function telaNovoAluno() {
       <div><button class="btn" type="submit" id="c-ok" style="max-width:320px">Cadastrar aluno</button></div>
     </form>`;
   ['#c-cel', '#c-rcel', '#c-ecel'].forEach((s) => mascararCelular($(s), D.formatarCelular));
-  $('#c-nasc').addEventListener('change', () => {
+  const ajustarMenor = () => {
     const i = D.idade($('#c-nasc').value);
-    const menor = i !== null && i < 18;
-    $('#c-resp').hidden = !menor;
-    $('#c-cel-rot').textContent = menor ? 'Celular do aluno, se tiver' : 'Celular com WhatsApp';
-  });
+    const menor16 = i !== null && i < 16;
+    const menor18 = i !== null && i < 18;
+    $('#c-resp').hidden = !menor18;
+    $('#c-resp-rot').textContent = menor16 ? 'Responsável' : 'Responsável, se quiser informar';
+    $('#c-resp-dica').textContent = menor16 ? 'Obrigatório para menores de 16 anos. O check-in pode ser feito com esse celular, e irmãos podem usar o mesmo número.' : 'Opcional entre 16 e 17 anos.';
+    $('#c-cel-rot').textContent = menor16 ? 'Celular do aluno, se tiver' : 'Celular com WhatsApp';
+  };
+  $('#c-nasc').addEventListener('change', ajustarMenor);
+  $('#c-nasc').addEventListener('input', ajustarMenor);
   $('#cad').addEventListener('submit', async (e) => {
     e.preventDefault();
     const erro = $('#c-erro');
@@ -427,6 +434,7 @@ function telaNovoAluno() {
         modalidades: $$('input[name="mod"]:checked').map((x) => x.value),
         emergencia: { nome: $('#c-enome').value, celular: $('#c-ecel').value },
         kimono: $('#c-kim').value, saude: $('#c-saude').value, pin: $('#c-pin').value, termo: $('#c-termo').checked,
+        treinaDesde: $('#c-inicio').value || null,
       });
       desenharMenu('novo-aluno');
       explodir($('#c-ok'));
@@ -469,10 +477,16 @@ function fichaAluno(id) {
       <div class="row"><span class="k">Nascimento</span><span class="v">${esc(D.dataCurta(a.nascimento))} ${esc(a.nascimento.slice(0, 4))}${i !== null ? `<small>${i} anos</small>` : ''}</span></div>
       ${a.celular ? `<div class="row"><span class="k">Celular</span><span class="v">${esc(cel(a.celular))}</span></div>` : ''}
       ${a.responsavel ? `<div class="row"><span class="k">Responsável</span><span class="v">${esc(a.responsavel.nome)}<small>${esc(cel(a.responsavel.celular))}</small></span></div>` : ''}
-      <div class="row"><span class="k">Emergência</span><span class="v">${esc(a.emergencia.nome)}<small>${esc(cel(a.emergencia.celular))}</small></span></div>
+      <div class="row"><span class="k">Emergência</span><span class="v">${a.emergencia ? `${esc(a.emergencia.nome || 'Sem nome')}<small>${esc(cel(a.emergencia.celular))}</small>` : 'Não informado'}</span></div>
       ${a.kimono ? `<div class="row"><span class="k">Kimono</span><span class="v">${esc(a.kimono)}</span></div>` : ''}
       <div class="row"><span class="k">Saúde</span><span class="v">${esc(a.saude || 'Nada informado')}</span></div>
-      <div class="row"><span class="k">Cadastro</span><span class="v">${esc(D.dataCurta(a.criadoEm))} ${esc(a.criadoEm.slice(0, 4))}<small>termo aceito</small></span></div>
+      <div class="row"><span class="k">Cadastro no sistema</span><span class="v">${esc(D.dataCurta(a.criadoEm))} ${esc(a.criadoEm.slice(0, 4))}<small>termo aceito</small></span></div>
+    </div>
+
+    <p class="section-label">Treina no CTA desde</p>
+    <div class="group">
+      <label class="field"><span>Data em que começou a treinar</span><input id="fa-inicio" type="date" value="${esc(a.treinaDesde)}" min="${esc(a.nascimento)}" max="${D.hojeISO()}"></label>
+      <div class="row"><button class="btn quiet small" type="button" id="fa-iniok">Salvar data</button><span class="k" id="fa-inimsg">${esc(D.mesAno(a.treinaDesde))}</span></div>
     </div>
 
     <p class="section-label">PIN da conta do aluno</p>
@@ -486,6 +500,10 @@ function fichaAluno(id) {
     if (grad) grad.addEventListener('click', () => { D.definirGraduacao(a.id, $('#fa-faixa', dlg).value, $('#fa-graus', dlg).value, quem.nome); explodir(grad, 'var(--red)'); aviso(`Graduação de ${D.primeiroNome(a.nome)} salva`); setTimeout(recarregar, 400); });
     $$('[data-dev]', dlg).forEach((b) => b.addEventListener('click', () => { D.devolver(b.dataset.dev); aviso('Devolução registrada'); recarregar(); }));
     $('#fa-emp', dlg).addEventListener('click', () => { fechar(); setTimeout(() => dialogoEmprestimo(a, () => { ir(); setTimeout(() => fichaAluno(id), 240); }), 240); });
+    $('#fa-iniok', dlg).addEventListener('click', async () => {
+      try { await D.definirInicio(a.id, $('#fa-inicio', dlg).value); $('#fa-inimsg', dlg).textContent = D.mesAno($('#fa-inicio', dlg).value); aviso(`Início de ${D.primeiroNome(a.nome)} atualizado`); }
+      catch (err) { $('#fa-inimsg', dlg).innerHTML = `<span class="flag">${esc(err.message)}</span>`; }
+    });
     $('#fa-pinok', dlg).addEventListener('click', async () => {
       try { await D.redefinirPin(a.id, $('#fa-pin', dlg).value); $('#fa-pin', dlg).value = ''; $('#fa-pinmsg', dlg).textContent = 'PIN redefinido. Avise o aluno.'; aviso('PIN redefinido'); }
       catch (err) { $('#fa-pinmsg', dlg).innerHTML = `<span class="flag">${esc(err.message)}</span>`; }

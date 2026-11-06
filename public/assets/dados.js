@@ -114,9 +114,9 @@ function montarAlunos(linhas) {
       id: r.id, nome: r.nome, nascimento: r.nascimento, celular: r.celular,
       responsavel: r.responsavel_celular ? { nome: r.responsavel_nome || '', celular: r.responsavel_celular } : null,
       modalidades: r.modalidades || [], kimono: r.kimono || '',
-      emergencia: { nome: r.emergencia_nome, celular: r.emergencia_celular },
+      emergencia: r.emergencia_celular || r.emergencia_nome ? { nome: r.emergencia_nome || '', celular: r.emergencia_celular || '' } : null,
       saude: r.saude || '', foto: r.foto || null,
-      criadoEm: dataLocal(r.criado_em), termoAceitoEm: r.termo_aceito_em,
+      criadoEm: dataLocal(r.criado_em), treinaDesde: r.treina_desde || dataLocal(r.criado_em), termoAceitoEm: r.termo_aceito_em,
       graduacoes: atual ? { jiujitsu: { faixa: atual.faixa, graus: atual.graus, data: atual.data, por: nomeEquipe(atual.por) } } : {},
       historicoGraduacoes: hist.slice(1).map((g) => ({ faixa: g.faixa, graus: g.graus, data: g.data, por: nomeEquipe(g.por) })),
     };
@@ -245,6 +245,7 @@ function argsCadastro(d) {
     p_modalidades: d.modalidades || [], p_kimono: d.kimono || '',
     p_emerg_nome: (d.emergencia && d.emergencia.nome) || '', p_emerg_celular: (d.emergencia && d.emergencia.celular) || '',
     p_saude: d.saude || '', p_foto: d.foto || null, p_pin: d.pin || '', p_termo: !!d.termo,
+    p_treina_desde: d.treinaDesde || null,
   };
 }
 
@@ -259,7 +260,7 @@ export async function cadastrar(dados) {
     return aluno(id);
   }
   const i = idade(dados.nascimento);
-  return { id, nome: dados.nome.trim(), responsavel: i !== null && i < 18 ? dados.responsavel : null };
+  return { id, nome: dados.nome.trim(), responsavel: i !== null && i < 16 ? dados.responsavel : null };
 }
 
 export async function redefinirPin(alunoId, novoPin) {
@@ -274,6 +275,19 @@ export function definirGraduacao(alunoId, faixa, graus) {
   graduacoesBrutas.push({ ...nova, id: Number.MAX_SAFE_INTEGER });
   if (a) { if (a.graduacoes.jiujitsu) a.historicoGraduacoes.unshift(a.graduacoes.jiujitsu); a.graduacoes.jiujitsu = { faixa, graus: Number(graus), data: hojeISO(), por: usuarioAtual.nome }; }
   gravar(cliente().from('graduacoes').insert(nova).then((r) => { if (!r.error) recarregar('graduacoes'); return r; }), 'graduacoes');
+}
+
+// muda a data em que o aluno começou a treinar no CTA
+export async function definirInicio(alunoId, data) {
+  const a = aluno(alunoId);
+  if (!data) throw new Error('Escolha uma data.');
+  if (data > hojeISO()) throw new Error('A data de início não pode ser no futuro.');
+  if (a && data < a.nascimento) throw new Error('A data de início não pode ser antes do nascimento.');
+  const { error } = await cliente().from('alunos').update({ treina_desde: data }).eq('id', alunoId);
+  if (error) throw new Error(mensagem(error));
+  if (a) a.treinaDesde = data;
+  const bruto = alunosBrutos.find((x) => x.id === alunoId);
+  if (bruto) bruto.treina_desde = data;
 }
 
 export function infantil(a) { const i = idade(a.nascimento); return i !== null && i < 16; }
@@ -430,7 +444,7 @@ export const site = {
     if (error) throw new Error(mensagem(error));
     if (!data || !data.length) throw new Error('Celular ou PIN incorretos. Se esqueceu o PIN, peça para um professor redefinir.');
     return data.map((a) => ({
-      id: a.id, nome: a.nome, modalidades: a.modalidades || [], foto: a.foto, criadoEm: dataLocal(a.criado_em),
+      id: a.id, nome: a.nome, modalidades: a.modalidades || [], foto: a.foto, criadoEm: dataLocal(a.criado_em), treinaDesde: a.treina_desde || dataLocal(a.criado_em),
       graduacao: a.graduacao, treinosNoMes: a.treinos_no_mes,
       emprestimos: (a.emprestimos || []).map((e) => ({ item: e.item, tamanho: e.tamanho, cor: e.cor || null, saida: e.saida })),
       ultimos: (a.ultimos || []).map((u) => ({ data: u.dia, hora: u.hora })),

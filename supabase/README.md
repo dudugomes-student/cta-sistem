@@ -1,11 +1,11 @@
 # Banco do CTA no Supabase
 
-Projeto **CTA Alphaville** (região São Paulo). As migrações aplicadas ficam registradas no próprio projeto, em Database > Migrations: `cta_tabelas`, `cta_funcoes`, `cta_pin_separado` e `cta_bloquear_cadastro_publico`.
+Projeto **CTA Alphaville** (região São Paulo). As migrações aplicadas ficam registradas no próprio projeto, em Database > Migrations: `cta_tabelas`, `cta_funcoes`, `cta_pin_separado`, `cta_bloquear_cadastro_publico` e `cta_inicio_responsavel_emergencia`.
 
 ## Tabelas
 
 - `equipe`: quem entra no painel. Cada pessoa é um usuário do Supabase Auth com login `nome@cta.app`.
-- `alunos`: cadastro completo, sem o PIN.
+- `alunos`: cadastro completo, sem o PIN. `treina_desde` guarda quando o aluno começou no CTA. Responsável é obrigatório para menores de 16 anos e opcional entre 16 e 17. Contato de emergência é opcional.
 - `graduacoes`: histórico de faixas e graus. A mais recente é a atual.
 - `checkins`: um por aluno por dia.
 - `emprestimos`: kimonos e faixas que saíram e voltaram.

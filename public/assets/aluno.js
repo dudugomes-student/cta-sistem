@@ -110,7 +110,7 @@ const TERMO = `
 <p>Sei que artes marciais e esportes de contato envolvem risco de lesão e declaro estar em condições de saúde adequadas para treinar. Vou informar aos professores qualquer problema de saúde, lesão ou restrição médica.</p>
 <p>Vou seguir as orientações dos professores e as regras de convivência do CTA, e devolver em bom estado os kimonos e faixas que pegar emprestados.</p>
 <p>Autorizo o CTA a guardar os dados deste cadastro, usados só para organizar os treinos, o check-in e os empréstimos, sem compartilhar com mais ninguém. Posso pedir a exclusão dos meus dados quando quiser.</p>
-<p>Para menores de 18 anos: como responsável legal, autorizo a participação do menor cadastrado e assumo estas declarações em nome dele.</p>`;
+<p>Para menores de idade com responsável informado: como responsável legal, autorizo a participação do menor cadastrado e assumo estas declarações em nome dele.</p>`;
 
 function telaCadastro() {
   app.innerHTML = `${topo('Cadastro')}
@@ -125,18 +125,18 @@ function telaCadastro() {
     </div>
 
     <div id="c-resp" hidden>
-      <p class="section-label">Responsável</p>
+      <p class="section-label" id="c-resp-rot">Responsável</p>
       <div class="group">
         <label class="field"><span>Nome do responsável</span><input id="c-rnome" placeholder="Patrícia Oliveira"></label>
         <label class="field"><span>Celular do responsável</span><input id="c-rcel" type="tel" inputmode="numeric" placeholder="(11) 90000-0000"></label>
       </div>
-      <p class="hint" style="margin-top:8px">O check-in pode ser feito com esse celular. Irmãos podem usar o mesmo número.</p>
+      <p class="hint" style="margin-top:8px" id="c-resp-dica"></p>
     </div>
 
     <p class="section-label">Modalidades</p>
     <div class="group"><div class="checks">${D.MODALIDADES.map((m) => `<label class="check"><input type="checkbox" name="mod" value="${m.id}">${m.nome}</label>`).join('')}</div></div>
 
-    <p class="section-label">Contato de emergência</p>
+    <p class="section-label">Contato de emergência, opcional</p>
     <div class="group">
       <label class="field"><span>Nome</span><input id="c-enome" placeholder="Maria Silva"></label>
       <label class="field"><span>Telefone</span><input id="c-ecel" type="tel" inputmode="numeric" placeholder="(11) 90000-0000"></label>
@@ -168,12 +168,16 @@ function telaCadastro() {
 
   ['#c-cel', '#c-rcel', '#c-ecel'].forEach((s) => mascararCelular($(s), D.formatarCelular));
   const ajustarMenor = () => {
-    const i = D.idade($('#c-nasc').value);
-    const menor = i !== null && i < 18;
-    $('#c-resp').hidden = !menor;
-    $('#c-cel-rot').textContent = menor ? 'Celular do aluno, se tiver' : 'Celular com WhatsApp';
+const i = D.idade($('#c-nasc').value);
+    const menor16 = i !== null && i < 16;
+    const menor18 = i !== null && i < 18;
+    $('#c-resp').hidden = !menor18;
+    $('#c-resp-rot').textContent = menor16 ? 'Responsável' : 'Responsável, se quiser informar';
+    $('#c-resp-dica').textContent = menor16 ? 'Obrigatório para menores de 16 anos. O check-in pode ser feito com esse celular, e irmãos podem usar o mesmo número.' : 'Opcional entre 16 e 17 anos.';
+    $('#c-cel-rot').textContent = menor16 ? 'Celular do aluno, se tiver' : 'Celular com WhatsApp';
   };
   $('#c-nasc').addEventListener('change', ajustarMenor);
+  $('#c-nasc').addEventListener('input', ajustarMenor);
 
   let foto = null;
   $('#c-foto').addEventListener('change', async (e) => { foto = e.target.files[0] ? await reduzirFoto(e.target.files[0]) : null; });
@@ -278,7 +282,7 @@ function mostrarCarteirinha(a, lista) {
       <div class="idtop"><span class="wordmark">CTA Alphaville</span><span>Aluno</span></div>
       <div class="idmain">
         <div class="photo">${a.foto ? `<img src="${esc(a.foto)}" alt="Foto de ${esc(a.nome)}">` : esc(a.nome.trim()[0])}</div>
-        <div><h2>${esc(a.nome)}</h2><p>Desde ${esc(D.mesAno(a.criadoEm))}</p><p>${esc(listaModalidades(a.modalidades))}</p></div>
+        <div><h2>${esc(a.nome)}</h2><p>Treina desde ${esc(D.mesAno(a.treinaDesde))}</p><p>${esc(listaModalidades(a.modalidades))}</p></div>
       </div>
       ${g ? `${faixa(g)}<p class="belt-label">Jiu-jitsu, ${esc(textoFaixa(g))}</p>` : ''}
     </div>

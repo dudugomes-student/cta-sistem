@@ -1,6 +1,6 @@
 import * as D from './dados.js';
 import { CONFIG } from './config.js';
-import { esc, $, $$, avatar, faixa, textoFaixa, faixasPara, abrirDialogo, mascararCelular, montarFundo, animar, trocarTela } from './ui.js';
+import { esc, $, $$, avatar, faixa, textoFaixa, faixasPara, abrirDialogo, mascararCelular, montarFundo, animar, trocarTela, abertura, explodir, aviso } from './ui.js';
 
 const raiz = $('#raiz');
 let quem = null;
@@ -59,8 +59,8 @@ function montarEstrutura() {
   raiz.innerHTML = `
   <div class="shell" id="shell">
     <aside class="sidebar" id="sidebar" aria-label="Menu do painel">
-      <div class="marca-topo"><a class="wordmark" href="#hoje">CTA</a><small>Painel</small></div>
-      <nav id="menu"></nav>
+      <div class="marca-topo"><a class="wordmark" href="#hoje">CTA</a><small>Painel</small><button class="recolher" type="button" id="recolher" aria-label="Recolher o menu"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button></div>
+      <nav id="menu"><span class="menu-indicador" id="indicador"></span><div id="menu-itens"></div></nav>
       <div class="rodape">${avatar({ nome: quem.nome })}<span>${esc(quem.nome)}<small>${esc(quem.login)}</small></span><button class="close" type="button" id="sair">Sair</button></div>
     </aside>
     <div class="veu" id="veu"></div>
@@ -78,12 +78,32 @@ function montarEstrutura() {
   $('#veu').addEventListener('click', fecharMenu);
   $('#menu').addEventListener('click', (e) => { if (e.target.closest('a')) fecharMenu(); });
   $('#sair').addEventListener('click', () => { quem = null; guardar(); ir(); });
+  let recolhido = false;
+  try { recolhido = localStorage.getItem('cta-menu') === 'recolhido'; } catch (e) { /* segue */ }
+  shell.classList.toggle('recolhido', recolhido);
+  $('#recolher').addEventListener('click', () => {
+    const r = shell.classList.toggle('recolhido');
+    try { localStorage.setItem('cta-menu', r ? 'recolhido' : ''); } catch (e) { /* segue */ }
+    setTimeout(posicionarIndicador, 520);
+  });
+  window.addEventListener('resize', posicionarIndicador);
+}
+
+function posicionarIndicador() {
+  const ind = $('#indicador');
+  const ativo = $('#menu-itens .menu-item[aria-current="page"]');
+  if (!ind || !ativo) { if (ind) ind.style.opacity = '0'; return; }
+  ind.style.opacity = '1';
+  ind.style.top = `${ativo.offsetTop}px`;
+  ind.style.height = `${ativo.offsetHeight}px`;
 }
 
 function desenharMenu(rota) {
   const c = contadores();
-  $('#menu').innerHTML = MENU.map((g) => `<div class="menu-grupo"><p>${g.grupo}</p>${g.itens.map(([id, nome]) => `
+  $('#menu-itens').innerHTML = MENU.map((g) => `<div class="menu-grupo"><p>${g.grupo}</p>${g.itens.map(([id, nome]) => `
     <a class="menu-item" href="#${id}"${id === rota ? ' aria-current="page"' : ''}>${icone(id)}<span>${nome}</span>${c[id] ? `<span class="conta${id === 'emprestimos' ? ' alerta' : ''}">${c[id]}</span>` : ''}</a>`).join('')}</div>`).join('');
+  if (!desenharMenu.feito) { $$('#menu-itens .menu-grupo').forEach((g) => { g.style.animation = 'entraLado .5s var(--mola) both'; }); desenharMenu.feito = true; } else { $$('#menu-itens .menu-grupo').forEach((g) => { g.style.animation = 'none'; }); }
+  requestAnimationFrame(posicionarIndicador);
 }
 
 const app = () => $('#app');
@@ -191,7 +211,7 @@ function telaNumeros() {
 function dialogoCheckin() {
   escolherAluno('Check-in de um aluno', (a, fechar) => {
     if (!D.fazerCheckin(a.id, quem.nome)) return;
-    fechar(); ir();
+    fechar(); aviso(`${D.primeiroNome(a.nome)}, presença marcada`); explodir($('#app h1')); ir();
   }, (a) => (D.fezHoje(a.id) ? '<span class="k">já fez hoje</span>' : ''));
 }
 
@@ -233,7 +253,8 @@ function telaCheckin() {
   };
   const ligarMarcar = (r) => $$('[data-marcar]', r).forEach((b) => b.addEventListener('click', () => {
     D.fazerCheckin(b.dataset.marcar, quem.nome);
-    b.classList.add('done'); b.textContent = 'Presença marcada';
+    b.classList.add('done'); b.textContent = 'Presença marcada'; explodir(b);
+    aviso(`${D.primeiroNome(D.aluno(b.dataset.marcar).nome)}, presença marcada`);
     setTimeout(() => ir(), 650);
   }));
   res.hidden = true;
@@ -262,7 +283,7 @@ function telaHorarios() {
     ${porDia.length ? `<div class="split">${porDia.map((d) => `<div class="view"><p class="section-label">${d.dia}</p><div class="group">${d.aulas.map((h) => `
       <div class="row"><span>${esc(nomeModalidade(h.modalidade))}${h.turma ? `<small>${esc(h.turma)}</small>` : ''}</span><span style="display:flex;gap:12px;align-items:center"><span class="v">${esc(h.inicio)} às ${esc(h.fim)}</span><button class="btn quiet small" type="button" data-hdel="${h.id}">Tirar</button></span></div>`).join('')}</div></div>`).join('')}</div>`
       : '<div class="group">' + vazio('Nenhum horário cadastrado.') + '</div>'}`;
-  $$('[data-hdel]').forEach((b) => b.addEventListener('click', () => { D.removerHorario(b.dataset.hdel); ir(); }));
+  $$('[data-hdel]').forEach((b) => b.addEventListener('click', () => { const linha = b.closest('.row'); linha.style.transition = 'opacity .3s, transform .3s'; linha.style.opacity = '0'; linha.style.transform = 'translateX(30px)'; D.removerHorario(b.dataset.hdel); aviso('Horário retirado do site'); setTimeout(ir, 300); }));
   $('#h-novo').addEventListener('click', dialogoHorario);
 }
 
@@ -278,7 +299,7 @@ function dialogoHorario() {
     <p class="alert" id="ho-erro" role="alert"></p>
     <button class="btn" type="button" id="ho-ok">Adicionar</button>`, (dlg, fechar) => {
     $('#ho-ok', dlg).addEventListener('click', () => {
-      try { D.adicionarHorario({ dia: $('#ho-dia', dlg).value, inicio: $('#ho-ini', dlg).value, fim: $('#ho-fim', dlg).value, modalidade: $('#ho-mod', dlg).value, turma: $('#ho-turma', dlg).value }); fechar(); ir(); }
+      try { D.adicionarHorario({ dia: $('#ho-dia', dlg).value, inicio: $('#ho-ini', dlg).value, fim: $('#ho-fim', dlg).value, modalidade: $('#ho-mod', dlg).value, turma: $('#ho-turma', dlg).value }); fechar(); aviso('Horário adicionado'); ir(); }
       catch (err) { $('#ho-erro', dlg).textContent = err.message; }
     });
   });
@@ -409,6 +430,8 @@ function telaNovoAluno() {
         kimono: $('#c-kim').value, saude: $('#c-saude').value, pin: $('#c-pin').value, termo: $('#c-termo').checked,
       });
       desenharMenu('novo-aluno');
+      explodir($('#c-ok'));
+      aviso(`${D.primeiroNome(novo.nome)} cadastrado`);
       fichaAluno(novo.id);
       telaNovoAluno();
       animar(app());
@@ -459,13 +482,13 @@ function fichaAluno(id) {
       <div class="row"><button class="btn quiet small" type="button" id="fa-pinok">Redefinir PIN</button><span class="k" id="fa-pinmsg"></span></div>
     </div>`, (dlg, fechar) => {
     const recarregar = () => { fechar(); ir(); setTimeout(() => fichaAluno(id), 240); };
-    $('#fa-ck', dlg).addEventListener('click', (ev) => { D.fazerCheckin(a.id, quem.nome); ev.currentTarget.classList.add('done'); ev.currentTarget.textContent = 'Presença marcada'; setTimeout(recarregar, 600); });
+    $('#fa-ck', dlg).addEventListener('click', (ev) => { D.fazerCheckin(a.id, quem.nome); ev.currentTarget.classList.add('done'); ev.currentTarget.textContent = 'Presença marcada'; explodir(ev.currentTarget); aviso(`${D.primeiroNome(a.nome)}, presença marcada`); setTimeout(recarregar, 650); });
     const grad = $('#fa-grad', dlg);
-    if (grad) grad.addEventListener('click', () => { D.definirGraduacao(a.id, $('#fa-faixa', dlg).value, $('#fa-graus', dlg).value, quem.nome); recarregar(); });
-    $$('[data-dev]', dlg).forEach((b) => b.addEventListener('click', () => { D.devolver(b.dataset.dev); recarregar(); }));
+    if (grad) grad.addEventListener('click', () => { D.definirGraduacao(a.id, $('#fa-faixa', dlg).value, $('#fa-graus', dlg).value, quem.nome); explodir(grad, 'var(--red)'); aviso(`Graduação de ${D.primeiroNome(a.nome)} salva`); setTimeout(recarregar, 400); });
+    $$('[data-dev]', dlg).forEach((b) => b.addEventListener('click', () => { D.devolver(b.dataset.dev); aviso('Devolução registrada'); recarregar(); }));
     $('#fa-emp', dlg).addEventListener('click', () => { fechar(); setTimeout(() => dialogoEmprestimo(a, () => { ir(); setTimeout(() => fichaAluno(id), 240); }), 240); });
     $('#fa-pinok', dlg).addEventListener('click', async () => {
-      try { await D.redefinirPin(a.id, $('#fa-pin', dlg).value); $('#fa-pin', dlg).value = ''; $('#fa-pinmsg', dlg).textContent = 'PIN redefinido. Avise o aluno.'; }
+      try { await D.redefinirPin(a.id, $('#fa-pin', dlg).value); $('#fa-pin', dlg).value = ''; $('#fa-pinmsg', dlg).textContent = 'PIN redefinido. Avise o aluno.'; aviso('PIN redefinido'); }
       catch (err) { $('#fa-pinmsg', dlg).innerHTML = `<span class="flag">${esc(err.message)}</span>`; }
     });
   });
@@ -521,7 +544,7 @@ function dialogoEmprestimo(alunoFixo, depois) {
       if (troca) troca.addEventListener('click', () => { alvo = null; montar(); });
       $('#em-ok', dlg).addEventListener('click', () => {
         if (!alvo) { $('#em-erro', dlg).textContent = 'Escolha o aluno.'; return; }
-        try { D.emprestar(alvo.id, item.value, tam.value, cor.value, quem.nome); fechar(); if (depois) setTimeout(depois, 230); }
+        try { D.emprestar(alvo.id, item.value, tam.value, cor.value, quem.nome); fechar(); aviso(`Empréstimo registrado para ${D.primeiroNome(alvo.nome)}`); if (depois) setTimeout(depois, 230); }
         catch (err) { $('#em-erro', dlg).textContent = err.message; }
       });
     };
@@ -540,7 +563,7 @@ function telaEmprestimos() {
     <p class="hint" style="margin-top:0">Cobrar aparece quando o aluno está há ${D.DIAS_COBRAR} dias ou mais sem treinar com um item emprestado.</p>`;
   ligarAlunos();
   $('#e-novo').addEventListener('click', () => dialogoEmprestimo(null, ir));
-  $$('[data-dev]').forEach((b) => b.addEventListener('click', () => { b.classList.add('done'); b.textContent = 'Devolvido'; D.devolver(b.dataset.dev); setTimeout(ir, 500); }));
+  $$('[data-dev]').forEach((b) => b.addEventListener('click', () => { b.classList.add('done'); b.textContent = 'Devolvido'; explodir(b); D.devolver(b.dataset.dev); aviso('Devolução registrada'); setTimeout(ir, 550); }));
 }
 
 function telaEstoque() {
@@ -579,7 +602,7 @@ function dialogoEstoque(s) {
     ajustar();
     $('#s-ok', dlg).addEventListener('click', () => {
       D.definirEstoque(item.value, tam.value, item.value === 'faixa' ? $('#s-cor', dlg).value : null, $('#s-total', dlg).value);
-      fechar(); ir();
+      fechar(); aviso('Estoque atualizado'); ir();
     });
   });
 }
@@ -611,7 +634,7 @@ function dialogoPessoa() {
     login.addEventListener('input', () => { mexeu = true; });
     nome.addEventListener('input', () => { if (!mexeu) login.value = nome.value.trim() ? D.loginDe(nome.value) : ''; });
     $('#p-ok', dlg).addEventListener('click', async () => {
-      try { await D.adicionarEquipe(nome.value, login.value, $('#p-senha', dlg).value); fechar(); ir(); }
+      try { await D.adicionarEquipe(nome.value, login.value, $('#p-senha', dlg).value); fechar(); aviso(`${D.primeiroNome(nome.value)} agora tem acesso ao painel`); ir(); }
       catch (err) { $('#p-erro', dlg).textContent = err.message; }
     });
   });
@@ -624,7 +647,7 @@ function dialogoSenha(id) {
     <p class="alert" id="ns-erro" role="alert"></p>
     <button class="btn" type="button" id="ns-ok">Salvar senha</button>`, (dlg, fechar) => {
     $('#ns-ok', dlg).addEventListener('click', async () => {
-      try { await D.redefinirSenha(id, $('#ns', dlg).value); fechar(); ir(); }
+      try { await D.redefinirSenha(id, $('#ns', dlg).value); fechar(); aviso('Senha redefinida'); ir(); }
       catch (err) { $('#ns-erro', dlg).textContent = err.message; }
     });
   });
@@ -670,4 +693,5 @@ function ir() {
 }
 
 montarFundo();
+abertura('Painel do professor');
 D.iniciar().then(() => { window.addEventListener('hashchange', ir); ir(); });

@@ -9,37 +9,142 @@ export const $$ = (sel, raiz = document) => Array.from(raiz.querySelectorAll(sel
 
 const semMovimento = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// fundo com esferas escuras e gotas de vidro, uma vez por página
+// fundo com luzes difusas, aurora e gotas de vidro, mais todos os efeitos de interação
 export function montarFundo() {
   if ($('.fundo')) return;
   const f = document.createElement('div');
   f.className = 'fundo';
   f.setAttribute('aria-hidden', 'true');
-  f.innerHTML = '<i class="orbe a"></i><i class="orbe b"></i><i class="orbe c"></i><i class="orbe vermelha"></i><i class="gota a"></i><i class="gota b"></i><i class="gota c"></i>';
+  f.innerHTML = '<i class="aurora"></i><i class="grade-luz"></i><i class="orbe a"></i><i class="orbe b"></i><i class="orbe c"></i><i class="orbe vermelha"></i><i class="gota a"></i><i class="gota b"></i><i class="gota c"></i>';
   document.body.prepend(f);
+  const barra = document.createElement('i');
+  barra.className = 'progresso';
+  barra.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(barra);
+  const rolagem = () => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    barra.style.setProperty('--rolagem', max > 0 ? (window.scrollY / max).toFixed(3) : 0);
+  };
+  window.addEventListener('scroll', rolagem, { passive: true });
   if (semMovimento()) return;
-  // as gotas acompanham o mouse de leve
+
+  const gotas = $$('.gota, .orbe', f);
+  const grade = $('.grade-luz', f);
   let pendente = false;
+  let ultimo = null;
   window.addEventListener('pointermove', (e) => {
+    ultimo = e;
     if (pendente) return;
     pendente = true;
     requestAnimationFrame(() => {
-      const dx = (e.clientX / window.innerWidth - 0.5) * 18;
-      const dy = (e.clientY / window.innerHeight - 0.5) * 18;
-      f.style.transform = `translate(${dx}px, ${dy}px)`;
+      const ev = ultimo;
+      const nx = ev.clientX / window.innerWidth - 0.5;
+      const ny = ev.clientY / window.innerHeight - 0.5;
+      // camadas do fundo se movem em profundidades diferentes
+      gotas.forEach((g, i) => { g.style.translate = `${nx * (10 + i * 6)}px ${ny * (10 + i * 6)}px`; });
+      grade.style.setProperty('--gx', `${(nx + 0.5) * 100}%`);
+      grade.style.setProperty('--gy', `${(ny + 0.5) * 100}%`);
+      // luz que segue o cursor nos cartões
+      const card = ev.target.closest && ev.target.closest('.group, .idcard');
+      if (card) {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', `${ev.clientX - r.left}px`);
+        card.style.setProperty('--my', `${ev.clientY - r.top}px`);
+        if (card.classList.contains('idcard')) {
+          const rx = ((ev.clientY - r.top) / r.height - 0.5) * -10;
+          const ry = ((ev.clientX - r.left) / r.width - 0.5) * 12;
+          card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0)`;
+        }
+      }
+      // botões magnéticos
+      const b = ev.target.closest && ev.target.closest('.btn:not([disabled])');
+      $$('.btn.ima').forEach((x) => { if (x !== b) { x.classList.remove('ima'); x.style.transform = ''; } });
+      if (b) {
+        const r = b.getBoundingClientRect();
+        const mx = (ev.clientX - (r.left + r.width / 2)) / r.width;
+        const my = (ev.clientY - (r.top + r.height / 2)) / r.height;
+        b.classList.add('ima');
+        b.style.transform = `translate(${mx * 8}px, ${my * 6 - 2}px)`;
+      }
       pendente = false;
     });
+  }, { passive: true });
+  document.addEventListener('pointerout', (e) => {
+    const card = e.target.closest && e.target.closest('.idcard');
+    if (card && !card.contains(e.relatedTarget)) card.style.transform = '';
   });
-  f.style.transition = 'transform .8s cubic-bezier(.2,.8,.2,1)';
-  // botões com brilho onde foram tocados
+  // onda que nasce onde o botão foi tocado
   document.addEventListener('pointerdown', (e) => {
-    const b = e.target.closest('.btn');
+    const b = e.target.closest('.btn, .close, .menu-btn, .recolher, .check');
     if (!b) return;
     const r = b.getBoundingClientRect();
-    b.style.setProperty('--x', `${e.clientX - r.left}px`);
-    b.style.setProperty('--y', `${e.clientY - r.top}px`);
-    b.classList.add('onda');
-    setTimeout(() => b.classList.remove('onda'), 30);
+    const lado = Math.max(r.width, r.height) * 2.2;
+    const o = document.createElement('span');
+    o.className = 'onda-el';
+    o.style.cssText = `width:${lado}px;height:${lado}px;left:${e.clientX - r.left - lado / 2}px;top:${e.clientY - r.top - lado / 2}px`;
+    if (getComputedStyle(b).position === 'static') b.style.position = 'relative';
+    b.style.overflow = 'hidden';
+    b.appendChild(o);
+    setTimeout(() => o.remove(), 700);
+  });
+}
+
+// abertura com o logo, uma vez por sessão
+export function abertura(texto) {
+  if (semMovimento()) return;
+  try { if (sessionStorage.getItem('cta-abertura')) return; sessionStorage.setItem('cta-abertura', '1'); } catch (e) { /* segue */ }
+  const a = document.createElement('div');
+  a.className = 'abertura';
+  a.setAttribute('aria-hidden', 'true');
+  a.innerHTML = `<div class="logo"><div class="letras"><span>C</span><span>T</span><span>A</span></div><i class="linha"></i><small>${esc(texto)}</small></div>`;
+  document.body.appendChild(a);
+  a.addEventListener('click', () => a.remove());
+  setTimeout(() => a.remove(), 2400);
+}
+
+// faíscas e anel de confirmação saindo de um elemento
+export function explodir(el, cor) {
+  if (semMovimento() || !el) return;
+  const r = el.getBoundingClientRect();
+  const e = document.createElement('div');
+  e.className = 'explosao';
+  e.style.left = `${r.left + r.width / 2}px`;
+  e.style.top = `${r.top + r.height / 2}px`;
+  const cores = cor ? [cor] : ['var(--done)', 'var(--red)', '#f2f2f3'];
+  let html = '<b></b>';
+  for (let i = 0; i < 16; i++) {
+    const ang = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
+    const dist = 50 + Math.random() * 50;
+    html += `<i style="--dx:${Math.cos(ang) * dist}px;--dy:${Math.sin(ang) * dist}px;--c:${cores[i % cores.length]};animation-delay:${Math.random() * 60}ms"></i>`;
+  }
+  e.innerHTML = html;
+  document.body.appendChild(e);
+  setTimeout(() => e.remove(), 900);
+}
+
+// aviso deslizante no canto da tela
+export function aviso(texto, tipo = 'ok') {
+  let pilha = $('.avisos');
+  if (!pilha) { pilha = document.createElement('div'); pilha.className = 'avisos'; pilha.setAttribute('role', 'status'); document.body.appendChild(pilha); }
+  const a = document.createElement('div');
+  a.className = `aviso${tipo === 'erro' ? ' erro' : ''}`;
+  a.innerHTML = `<span class="ponto"><svg viewBox="0 0 12 12">${tipo === 'erro' ? '<path d="M3 3l6 6M9 3l-6 6"/>' : '<path d="M2 6.3l2.6 2.5L10 3.4"/>'}</svg></span><span>${esc(texto)}</span>`;
+  pilha.appendChild(a);
+  const sair = () => { a.classList.add('saindo'); setTimeout(() => a.remove(), 350); };
+  a.addEventListener('click', sair);
+  setTimeout(sair, 3200);
+}
+
+// títulos surgem palavra por palavra, com um brilho que passa por cima
+export function titulos(raiz) {
+  if (semMovimento()) return;
+  $$('h1', raiz).forEach((h) => {
+    if (h.dataset.animado) return;
+    h.dataset.animado = '1';
+    const palavras = h.textContent.trim().split(/\s+/);
+    h.setAttribute('aria-label', h.textContent.trim());
+    h.innerHTML = palavras.map((p, i) => `<span class="palavra" aria-hidden="true"><span style="--p:${i}">${esc(p)}</span></span>`).join(' ');
+    h.classList.add('brilho');
   });
 }
 
@@ -53,6 +158,7 @@ export function animar(raiz) {
     g.classList.add('cascata');
     Array.from(g.children).forEach((c, i) => c.style.setProperty('--i', Math.min(i, 14)));
   });
+  titulos(raiz);
   contarNumeros(raiz);
 }
 

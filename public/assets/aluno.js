@@ -1,6 +1,6 @@
 import * as D from './dados.js';
 import { CONFIG } from './config.js';
-import { esc, $, $$, avatar, faixa, textoFaixa, mascararCelular, marcarAba, montarFundo, animar, trocarTela } from './ui.js';
+import { esc, $, $$, avatar, faixa, textoFaixa, mascararCelular, marcarAba, montarFundo, animar, trocarTela, abertura, explodir, aviso } from './ui.js';
 
 const app = $('#app');
 const abas = $('#abas');
@@ -72,6 +72,8 @@ function telaCheckin() {
       const agora = new Date();
       b.classList.add('done');
       b.textContent = `${D.primeiroNome(a.nome)}, presença registrada`;
+      explodir(b);
+      aviso('Presença registrada. Bom treino.');
       $('#ck-msg').textContent = `Às ${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}. Bom treino.`;
     });
   };
@@ -181,6 +183,7 @@ function telaCadastro() {
         <a class="btn" href="#checkin">Ir para o check-in</a>
       </section>`;
       animar(app);
+      setTimeout(() => explodir($('#app h1')), 350);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       erro.textContent = err.message;
@@ -302,6 +305,7 @@ function ir() {
 }
 
 montarFundo();
+abertura('Centro de Treinamento de Alphaville');
 if (document.fonts) document.fonts.ready.then(() => marcarAba(abas, (location.hash || '#checkin').slice(1)));
 window.addEventListener('resize', () => marcarAba(abas, (location.hash || '#checkin').slice(1)));
 D.iniciar().then(() => { window.addEventListener('hashchange', () => { ir(); window.scrollTo({ top: 0, behavior: 'smooth' }); }); ir(); });
